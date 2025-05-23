@@ -18,9 +18,9 @@ description = "Supports GitHub CICD by validating policy statements and then cre
 # timeout = 30
 # memory = 128
 # ephemeral_storage = 512
+repository_arn = "'arn:aws:ecr:us-east-1:473958445471:repository/lambda/vaynermedia-newyork/my-test-lambda"
 # lambda_arn = "arn:aws:lambda:us-east-1:123456789012:function:my-cool-lambda-lambda"
 # role_arn = "arn:aws:iam::123456789012:role/my-cool-lambda-role"
-# repository_arn = "arn:aws:ecr:us-east-1:123456789012:repository/my-cool-lambda-repository"
 
 [policy]
 Version = "2025-05-22"
