@@ -1,9 +1,12 @@
 import os, boto3, fnmatch, re, json
+from typing import List, Tuple
 
 def lambda_handler(event, context):
     manifest = json.loads(event.get("body","{}"))
 
     manifest = update_manifest(manifest)
+
+    create_or_update_role(manifest)
 
     return {
         "statusCode": 200,
@@ -15,7 +18,7 @@ def lambda_handler(event, context):
         
     }
 
-def validate_lambda_policy(policy):
+def validate_lambda_policy(policy) -> Tuple[int, List[str]]:
     errors = []
     allowed_iam_patterns = ["iam:Get*", "iam:List*"]
     statements = policy.get("Statement", [])
@@ -127,3 +130,51 @@ def update_manifest(manifest) -> dict:
     }
 
     return manifest
+
+def create_or_update_role(manifest) -> None:
+    iam_client = boto3.client('iam')
+
+    paginator = iam_client.get_paginator('list_roles')
+    existing_roles = [role['Arn'].lower() for page in paginator.paginate() for role in page['Roles']]
+
+    role_arn = manifest['role_arn']
+    Path, RoleName = re.match(r'.+\:role(\/.*\/)(.+)',role_arn).groups()
+    if role_arn.lower() not in existing_roles:
+        # Create the role
+        print(f"Role: {role_arn} doesn't exist yet and will be created")
+        iam_client.create_role(
+            Path=Path,
+            RoleName=RoleName,
+            AssumeRolePolicyDocument=json.dumps(manifest['trust_policy']),
+        )
+    else: 
+        print(f"Role: {role_arn} already exists and will be updated")
+        iam_client.update_assume_role_policy(
+            RoleName=RoleName,
+            PolicyDocument=json.dumps(manifest['trust_policy'])
+        )
+
+    # Remove all inline policies
+    inline_policies = iam_client.list_role_policies(RoleName=RoleName)['PolicyNames']
+    for policy_name in inline_policies:
+        iam_client.delete_role_policy(RoleName=RoleName, PolicyName=policy_name)
+        print(f"Deleted inline policy: {policy_name}")
+
+    # Attach the logging policy
+    iam_client.put_role_policy(
+        RoleName=RoleName,
+        PolicyName='logging_policy',
+        PolicyDocument=json.dumps(manifest['logs_policy'])
+    )
+    print("Attached logging policy")
+
+    # Attach other policies
+    policy = manifest.get('policy')
+    if policy:
+        iam_client.put_role_policy(
+            RoleName=RoleName,
+            PolicyName='permissions_policy',
+            PolicyDocument=json.dumps(policy)
+        )
+        print("Attached permissions policy")
+
