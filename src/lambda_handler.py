@@ -135,11 +135,14 @@ def create_or_update_role(manifest) -> None:
     iam_client = boto3.client('iam')
 
     paginator = iam_client.get_paginator('list_roles')
-    existing_roles = [role['Arn'].lower() for page in paginator.paginate() for role in page['Roles']]
+    existing_roles = [role['Arn'] for page in paginator.paginate() for role in page['Roles']]
 
-    role_arn = manifest['role_arn']
+    remote_role = next(iter(r for r in existing_roles if r.lower() == role_arn.lower()),None)
+
+    role_arn = remote_role or manifest['role_arn']
     Path, RoleName = re.match(r'.+\:role(\/.*\/)(.+)',role_arn).groups()
-    if role_arn.lower() not in existing_roles:
+
+    if not remote_role:
         # Create the role
         print(f"Role: {role_arn} doesn't exist yet and will be created")
         iam_client.create_role(
