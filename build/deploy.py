@@ -13,32 +13,11 @@ def create_payload_json() -> None:
     if 'lambda_name' not in manifest:
         manifest['lambda_name'] = org_name.lower() + '/' + sanitize(repo_name.lower())
 
-    if any(prop not in manifest for prop in ['lambda_arn','role_arn','repository_uri']):
+    if 'repository_arn' not in manifest:
         sts_client = boto3.client('sts')
         account_id = sts_client.get_caller_identity()['Account']
         region_name = sts_client.meta.region_name
-
-    if 'lambda_arn' not in manifest:
-        manifest['lambda_arn'] = f"arn:aws:lambda:{region_name}:{account_id}:function:{sanitize(manifest['lambda_name'])}"
-
-    if 'role_arn' not in manifest:
-        manifest['role_arn'] = f"arn:aws:iam::{account_id}:role/lambda/{manifest['lambda_name']}"
-
-    if 'repository_arn' not in manifest:
-        manifest['repository_arn'] = f"arn:aws:ecr:{region_name}:{account_id}:repository/lambda/{manifest['lambda_name']}"
-
-    manifest['role_arn'] = manifest['role_arn'].lower()
-    manifest['repository_arn'] = manifest['repository_arn'].lower()
-
-    # Set defaults for missing fields
-    props = {
-        "description": "",
-        "timeout": 30,
-        "memory": 128,
-        "ephemeral_storage": 512,
-    }
-    for k,v in props.items():
-        manifest[k] = manifest.get(k) or v
+        manifest['repository_arn'] = f"arn:aws:ecr:{region_name}:{account_id}:repository/lambda/{manifest['lambda_name'].lower()}"
 
     print("Saving payload.json")
     with open("payload.json", "w") as f:
