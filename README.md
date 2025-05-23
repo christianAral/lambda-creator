@@ -1,0 +1,5 @@
+This is an example repo designed to provide a template for engineering to deploy serverless applications. Using this template allows the developer to work in their IDE of choice and then publish to a `deployments` branch which creates a docker image in AWS Elastic Container Registry of your `/src` folder and includes any packages specified in the `requirements.txt`. From there, a lambda function can be created from said image and granted necessary permissions to AWS resources for functionality (e.g. secrets manager to retrieve snowflake credentials or API tokens). General usage follows below:
+
+1. Make sure you're in the right branch to do testing/work `git checout main`
+2. Do some work as usual and make your commits
+3. Execute `./deploy.sh` to push changes from `main` --> `deployments` and trigger the github action

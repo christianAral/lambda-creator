@@ -1,0 +1,59 @@
+name: Build and Deploy Docker Image to AWS ECR
+
+on:
+  push:
+    branches:
+      - deployments
+
+permissions:
+  id-token: write # Required for OIDC authentication
+  contents: read # Required if using actions/checkout
+
+jobs:
+  build-and-push:
+    if: ${{ github.repository_owner == 'VaynerMedia-NewYork' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set AWS Region
+        run: echo "AWS_REGION=us-east-1" >> $GITHUB_ENV
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: arn:aws:iam::473958445471:role/github-cicd
+          role-session-name: GitHubActions
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set AWS ECR Registry
+        run: |
+          ORG_NAME=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          REPO_NAME=$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]' | tr '/' '_')  # Replace slashes with underscores
+          ECR_REPO="${ORG_NAME}_${REPO_NAME}"
+
+          echo "AWS_ECR_REGISTRY=$(aws sts get-caller-identity --query 'Account' --output text).dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com" >> $GITHUB_ENV
+          echo "ECR_REPO=$ECR_REPO" >> $GITHUB_ENV
+
+      - name: Ensure ECR Repository Exists
+        run: |
+          aws ecr describe-repositories --repository-names ${{ env.ECR_REPO }} --region ${{ env.AWS_REGION }} || \
+          aws ecr create-repository --repository-name ${{ env.ECR_REPO }} --region ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        run: |
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.AWS_ECR_REGISTRY }}
+
+      - name: Build Docker Image
+        run: |
+          IMAGE_URI=${{ env.AWS_ECR_REGISTRY }}/${{ env.ECR_REPO }}:${{ github.sha }}
+          docker build -t $IMAGE_URI .
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+
+      - name: Push Docker Image to ECR
+        run: docker push ${{ env.IMAGE_URI }}
+
+      - name: Output Image URI
+        run: echo "Docker Image pushed to ${{ env.IMAGE_URI }}"

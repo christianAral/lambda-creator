@@ -1,0 +1,4 @@
+ipykernel
+requests
+snowflake-snowpark-python
+boto3
