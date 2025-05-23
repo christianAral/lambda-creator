@@ -57,16 +57,17 @@ def validate_lambda_policy(policy):
 
 def update_manifest(manifest) -> dict:
 
+    lambda_name = manifest['lambda_name']
     repo_arn = manifest['repository_arn']
     arn_parts =  repo_arn.split(':')
     region_name = arn_parts[3]
     account_id = arn_parts[4]
 
     if 'lambda_arn' not in manifest:
-        manifest['lambda_arn'] = f"arn:aws:lambda:{region_name}:{account_id}:function:{manifest['lambda_name'].replace('/','_')}"
+        manifest['lambda_arn'] = f"arn:aws:lambda:{region_name}:{account_id}:function:{lambda_name.replace('/','_')}"
 
     if 'role_arn' not in manifest:
-        manifest['role_arn'] = f"arn:aws:iam::{account_id}:role/lambda/{manifest['lambda_name'].lower()}"
+        manifest['role_arn'] = f"arn:aws:iam::{account_id}:role/lambda/{lambda_name.lower()}"
 
     props = {
         "description": "",
