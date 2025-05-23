@@ -156,6 +156,7 @@ def create_or_update_role(manifest) -> None:
             RoleName=RoleName,
             PolicyDocument=json.dumps(manifest['trust_policy'])
         )
+        manifest['role_arn'] = role_arn # Update the role_arn in manifest so lambda has case-sensitive role name
 
     # Remove all inline policies
     inline_policies = iam_client.list_role_policies(RoleName=RoleName)['PolicyNames']
