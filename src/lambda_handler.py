@@ -108,4 +108,22 @@ def update_manifest(manifest) -> dict:
         ]
     }
 
+    manifest['trust_policy'] = {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Principal": {
+                    "Service": "lambda.amazonaws.com"
+                },
+                "Action": "sts:AssumeRole",
+                "Condition": {
+                    "ArnLike": {
+                    "AWS:SourceArn": manifest['lambda_arn']
+                    }
+                }
+            }
+        ]
+    }
+
     return manifest
