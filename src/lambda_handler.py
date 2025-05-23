@@ -1,4 +1,4 @@
-import os, boto3, fnmatch, re, json
+import boto3, fnmatch, re, json, time
 from typing import List, Tuple
 
 def lambda_handler(event, context):
@@ -7,14 +7,11 @@ def lambda_handler(event, context):
     manifest = update_manifest(manifest)
 
     create_or_update_role(manifest)
+    create_or_update_lambda(manifest)
 
     return {
         "statusCode": 200,
-        "body": json.dumps(
-            {
-                "event": event,
-            }
-        ),
+        "body": "Deployment Successful",
         
     }
 
@@ -182,3 +179,72 @@ def create_or_update_role(manifest) -> None:
         )
         print("Attached permissions policy")
 
+def wait_for_lambda_update(lambda_client, function_name:str, delay:int=2, max_attempts:int=30):
+    for attempt in range(max_attempts):
+        resp = lambda_client.get_function_configuration(FunctionName=function_name)
+        status = resp['LastUpdateStatus']
+        if status == 'Successful':
+            return
+        elif status == 'Failed':
+            raise Exception(f"Lambda update failed: {resp.get('LastUpdateStatusReason', 'unknown')}")
+        time.sleep(delay)
+    raise TimeoutError("Timed out waiting for Lambda to finish updating.")
+
+def get_most_recent_image_uri(repository_arn:str) -> str:
+    ecr_client = boto3.client('ecr')
+    region, account_id, repository_name = re.match(r'.+ecr\:(.+)\:(\d+)\:repository\/(.+)',repository_arn).groups()
+    response = ecr_client.describe_images(repositoryName=repository_name)
+    image_details = response['imageDetails']
+    # Sort by pushedAt (descending)
+    latest_image = sorted(image_details, key=lambda x: x['imagePushedAt'], reverse=True)[0]
+    latest_tag = latest_image['imageTags'][0]  # Take the first tag
+    return f"{account_id}.dkr.ecr.{region}.amazonaws.com/{repository_name}:{latest_tag}"
+
+def create_or_update_lambda(manifest) -> None:
+    lambda_client = boto3.client('lambda')
+
+    paginator = lambda_client.get_paginator('list_functions')
+    existing_functions = [fn['FunctionArn'] for page in paginator.paginate() for fn in page['Functions']]
+
+    remote_function = next(iter(r for r in existing_functions if r.lower() == manifest['lambda_arn'].lower()),None)
+
+    function_arn = remote_function or manifest['lambda_arn']
+
+    image_uri = get_most_recent_image_uri(manifest['repository_arn'])
+
+    if not remote_function:
+        # Create the role
+        print(f"Function: {function_arn} doesn't exist yet and will be created")
+        lambda_client.create_function(
+                FunctionName=function_arn,
+                Role=manifest['role_arn'],
+                Code={'ImageUri': image_uri},
+                PackageType='Image',
+                Description=manifest['description'],
+                MemorySize=manifest['memory'],
+                Timeout=manifest['timeout'],
+                EphemeralStorage={
+                    'Size': manifest['ephemeral_storage']
+                },
+                Publish=True
+            )
+    else: 
+        print(f"Function: {function_arn} already exists and will be updated")
+        lambda_client.update_function_configuration(
+            FunctionName=function_arn,
+            Role=manifest['role_arn'],
+            Description=manifest['description'],
+            MemorySize=manifest['memory'],
+            Timeout=manifest['timeout'],
+            EphemeralStorage={
+                'Size': manifest['ephemeral_storage']
+            },
+        )
+        
+        wait_for_lambda_update(lambda_client, function_arn)
+        
+        lambda_client.update_function_code(
+            FunctionName=function_arn,
+            ImageUri=image_uri,
+            Publish=True,
+        )
