@@ -137,7 +137,7 @@ def create_or_update_role(manifest) -> None:
     paginator = iam_client.get_paginator('list_roles')
     existing_roles = [role['Arn'] for page in paginator.paginate() for role in page['Roles']]
 
-    remote_role = next(iter(r for r in existing_roles if r.lower() == role_arn.lower()),None)
+    remote_role = next(iter(r for r in existing_roles if r.lower() == manifest['role_arn'].lower()),None)
 
     role_arn = remote_role or manifest['role_arn']
     Path, RoleName = re.match(r'.+\:role(\/.*\/)(.+)',role_arn).groups()
