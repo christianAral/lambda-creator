@@ -3,7 +3,7 @@ import os, boto3, fnmatch, re, json
 def lambda_handler(event, context):
     manifest = json.loads(event.get("body","{}"))
 
-    manifest = create_manifest(manifest)
+    manifest = update_manifest(manifest)
 
     return {
         "statusCode": 200,
@@ -13,22 +13,7 @@ def lambda_handler(event, context):
             }
         ),
         
-    }, manifest
-
-def sanitize(lambda_name: str) -> str:
-    """
-    Converts a string into an ARN-safe Lambda function name.
-    - Keeps only letters, numbers, hyphens, and underscores.
-    - Truncates to 64 characters.
-    - Replaces sequences of invalid characters with a single underscore.
-    - Strips leading/trailing underscores or hyphens.
-    """
-    # Replace invalid characters with underscore
-    sanitized = re.sub(r'[^A-Za-z0-9_-]+', '_', lambda_name)
-    # Remove leading/trailing underscores/hyphens
-    sanitized = sanitized.strip('_-')
-    # Truncate to 57 chars (ARN limit after suffixes)
-    return sanitized[:57]
+    }
 
 def validate_lambda_policy(policy):
     errors = []
@@ -70,29 +55,18 @@ def validate_lambda_policy(policy):
                         )
     return len(errors) == 0, errors
 
-def create_manifest(manifest) -> dict:
+def update_manifest(manifest) -> dict:
 
-    if 'lambda_name' not in manifest:
-        manifest['lambda_name'] = os.path.split(os.getcwd())[-1]
-
-    manifest['lambda_name'] = sanitize(manifest['lambda_name'])
-
-    if any(prop not in manifest for prop in ['lambda_arn','role_arn','repository_uri']):
-        sts_client = boto3.client('sts')
-        account_id = sts_client.get_caller_identity()['Account']
-        region_name = sts_client.meta.region_name
+    repo_arn = manifest['repository_arn']
+    arn_parts =  repo_arn.split(':')
+    region_name = arn_parts[3]
+    account_id = arn_parts[4]
 
     if 'lambda_arn' not in manifest:
-        manifest['lambda_arn'] = f"arn:aws:lambda:{region_name}:{account_id}:function:{manifest['lambda_name']}-lambda"
+        manifest['lambda_arn'] = f"arn:aws:lambda:{region_name}:{account_id}:function:{manifest['lambda_name'].replace('/','_')}"
 
     if 'role_arn' not in manifest:
-        manifest['role_arn'] = f"arn:aws:iam::{account_id}:role/{manifest['lambda_name']}-lambda"
-
-    if 'repository_arn' not in manifest:
-        manifest['role_arn'] = f"arn:aws:ecr:{region_name}:{account_id}:repository/{manifest['lambda_name']}-lambda"
-
-    manifest['role_arn'] = manifest['role_arn'].lower()
-    manifest['repository_arn'] = manifest['repository_uri'].lower()
+        manifest['role_arn'] = f"arn:aws:iam::{account_id}:role/lambda/{manifest['lambda_name'].lower()}"
 
     props = {
         "description": "",
@@ -104,7 +78,7 @@ def create_manifest(manifest) -> dict:
     for k,v in props.items():
         manifest[k] = manifest.get(k) or v
 
-    valid_policy, policy_issues = validate_lambda_policy(manifest['policy'])
+    valid_policy, policy_issues = validate_lambda_policy(manifest.get('policy'))
 
     if not valid_policy:
         raise PermissionError(f"Requested policies were not permitted {policy_issues}")
