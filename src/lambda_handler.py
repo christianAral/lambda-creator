@@ -86,10 +86,13 @@ def create_manifest(manifest) -> dict:
         manifest['lambda_arn'] = f"arn:aws:lambda:{region_name}:{account_id}:function:{manifest['lambda_name']}-lambda"
 
     if 'role_arn' not in manifest:
-        manifest['role_arn'] = f"arn:aws:iam::{account_id}:role/{manifest['lambda_name']}-role"
+        manifest['role_arn'] = f"arn:aws:iam::{account_id}:role/{manifest['lambda_name']}-lambda"
 
-    if 'repository_uri' not in manifest:
-        manifest['role_arn'] = f"{account_id}.dkr.ecr.{region_name}.amazonaws.com/{manifest['lambda_name']}-repo"
+    if 'repository_arn' not in manifest:
+        manifest['role_arn'] = f"arn:aws:ecr:{region_name}:{account_id}:repository/{manifest['lambda_name']}-lambda"
+
+    manifest['role_arn'] = manifest['role_arn'].lower()
+    manifest['repository_arn'] = manifest['repository_uri'].lower()
 
     props = {
         "description": "",

@@ -5,7 +5,7 @@
 # ephemeral_storage [Optional] [Default = 512, Max = 10240] The amount of ephemeral storage available to the function in MB
 # lambda_arn        [Optional] The ARN of the Lambda function. If not provided, will be generated based on lambda_name
 # role_arn          [Optional] The ARN of the IAM role that the Lambda function assumes. If not provided, will be generated based on lambda_name
-# repository_uri    [Optional] The URI of the ECR repository where the Lambda function's image is stored. If not provided, will be generated based on lambda_name
+# repository_arn    [Optional] The ARN of the ECR repository where the Lambda function's image is stored. If not provided, will be generated based on lambda_name
 # policy            [Optional] The IAM policy that defines the permissions for the Lambda function.
 #                       - Do not include a policy statement for cloudwatch logs, as it is automatically added by the Lambda service.
 #                       - Policy statement with iam actions are not permitted except for iam:List* and iam:Get* actions.
@@ -20,7 +20,7 @@ description = "This is a cool lambda function"
 # ephemeral_storage = 512
 # lambda_arn = "arn:aws:lambda:us-east-1:123456789012:function:my-cool-lambda-lambda"
 # role_arn = "arn:aws:iam::123456789012:role/my-cool-lambda-role"
-# repository_uri = "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-cool-lambda-repository"
+# repository_arn = "arn:aws:ecr:us-east-1:123456789012:repository/my-cool-lambda-repository"
 
 [policy]
 Version = "2025-05-22"
