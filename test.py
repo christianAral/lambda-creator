@@ -5,7 +5,7 @@ import src.lambda_handler
 
 if __name__ == '__main__':
     # Test the lambda_handler function
-    with open('manifest.toml','rb') as f:
+    with open('build/manifest.toml','rb') as f:
         manifest = tomllib.load(f)
 
     event = {
